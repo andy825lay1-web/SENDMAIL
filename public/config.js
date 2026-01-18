@@ -11,10 +11,10 @@
   // API 基礎 URL
   // 本地開發：使用 localhost
   // GitHub Pages：需要設置為後端服務的 URL（如 Render、Railway 等）
-  // 請在部署後更新下面的 BACKEND_URL
+  // ⚠️ 重要：請將下面的 YOUR-BACKEND-URL 替換為您的實際 Render 後端 URL
   const BACKEND_URL = isLocalhost 
     ? 'http://localhost:3000'
-    : 'https://YOUR-BACKEND-URL.onrender.com'; // 👈 部署後端後，修改此處
+    : 'https://sendmail-backend.onrender.com'; // 👈 請替換為您的實際 Render URL
   
   // 全局 API 基礎地址
   window.API_BASE = `${BACKEND_URL}/api`;
@@ -26,8 +26,9 @@
   } else if (isGitHubPages) {
     console.log('🌐 GitHub Pages 模式');
     console.log('📡 API 地址：', window.API_BASE);
-    if (BACKEND_URL.includes('YOUR-BACKEND-URL')) {
-      console.warn('⚠️ 警告：請更新 config.js 中的 BACKEND_URL');
+    if (BACKEND_URL.includes('YOUR-BACKEND-URL') || BACKEND_URL.includes('sendmail-backend.onrender.com')) {
+      console.warn('⚠️ 警告：請更新 config.js 中的 BACKEND_URL 為您的實際 Render URL');
+      console.warn('   如果後端尚未部署，請先前往 https://render.com 部署後端服務');
     }
   }
 })();
