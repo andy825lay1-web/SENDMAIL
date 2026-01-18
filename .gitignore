@@ -4,7 +4,10 @@ data/customers.json
 data/send-stats.json
 # 但允許示例文件
 !data/customers.example.json
+# 環境變數和 API Keys（保護隱私）
 .env
+.env.local
+.automation-keys.json
 .DS_Store
 *.log
 .git-credentials
