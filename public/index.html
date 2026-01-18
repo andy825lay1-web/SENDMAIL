@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客戶郵件發送系統</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📧</text></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📧 客戶郵件發送系統</h1>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="send">發送郵件</button>
+            <button class="tab-btn" data-tab="manage">客戶管理</button>
+            <button class="tab-btn" data-tab="import">導入資料</button>
+        </div>
+
+        <!-- 發送郵件標籤頁 -->
+        <div class="tab-content active" id="send-tab">
+            <div class="card">
+                <h2>📤 發送郵件</h2>
+                <div class="info-box">
+                    <p><strong>使用說明：</strong></p>
+                    <ul>
+                        <li>填入您的 Gmail 帳號和應用程式專用密碼</li>
+                        <li>撰寫郵件主旨和內容</li>
+                        <li>選擇要發送的客戶（可多選或選擇全部）</li>
+                        <li>點擊「發送郵件」即可批量發送</li>
+                        <li>郵件內容可使用 <code>{name}</code> 作為客戶名稱的佔位符</li>
+                    </ul>
+                </div>
+                <!-- 發送限制顯示 -->
+                <div id="send-limit-info" class="info-box" style="display: none; margin-bottom: 20px; background: #f0f7ff; border-left: 4px solid #2196F3;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>📊 今日發送統計</strong>
+                            <div style="margin-top: 8px; font-size: 14px;">
+                                <span id="limit-stats">載入中...</span>
+                            </div>
+                        </div>
+                        <button type="button" id="refresh-stats-btn" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            🔄 刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="email-form">
+                    <div class="form-group">
+                        <label>發送者 Gmail 信箱：</label>
+                        <input type="email" id="sender-email" required placeholder="your-email@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Gmail 應用程式密碼：</label>
+                        <input type="password" id="sender-password" required placeholder="應用程式密碼（非 Gmail 密碼）">
+                        <small>
+                            💡 <a href="https://myaccount.google.com/apppasswords" target="_blank">如何產生應用程式專用密碼？</a>
+                            <br>需要先啟用兩步驟驗證，然後到 Google 帳戶設定中產生應用程式專用密碼
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="remember-credentials" checked>
+                            記住帳號資訊（下次自動填入）
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>郵件主旨：</label>
+                        <input type="text" id="email-subject" required placeholder="例如：感謝您的支持">
+                    </div>
+                    <div class="form-group">
+                        <label>郵件內容：</label>
+                        <textarea id="email-message" rows="12" required placeholder="親愛的 {name}，&#10;&#10;感謝您的支持！&#10;&#10;此致&#10;敬禮"></textarea>
+                        <small>提示：使用 <code>{name}</code> 會自動替換為客戶名稱</small>
+                    </div>
+                    <div class="form-group">
+                        <label>選擇收件人：</label>
+                        <select id="recipient-select" multiple size="6">
+                            <option value="all">✅ 全部客戶</option>
+                        </select>
+                        <small>💡 按住 Ctrl (Windows) 或 Cmd (Mac) 可多選，預設選擇全部客戶</small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="send-only-unsent" checked>
+                            📋 只發送今天未發送的客戶（自動跳過今天已發送的）
+                        </label>
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            ✅ 勾選後，系統會自動跳過今天已經發送過的客戶，方便隔天接續發送剩餘客戶
+                        </small>
+                    </div>
+                    <div id="send-status-info" class="info-box" style="margin-top: 10px; background: #f9f9f9; border-left: 4px solid #4caf50; display: none;">
+                        <strong>📊 發送狀態統計</strong>
+                        <div style="margin-top: 8px; font-size: 14px;">
+                            <span id="send-status-stats">載入中...</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-large">
+                        <span>📧</span> 發送郵件
+                    </button>
+                </form>
+                
+                <!-- 進度顯示區域 -->
+                <div id="progress-container" style="display: none; margin-top: 20px;">
+                    <div class="progress-info">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span id="progress-message">準備發送...</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                            <span id="progress-details">等待開始...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="send-result" class="result"></div>
+            </div>
+        </div>
+
+        <!-- 客戶管理標籤頁 -->
+        <div class="tab-content" id="manage-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h2>客戶列表</h2>
+                    <div class="card-actions">
+                        <button class="btn btn-secondary" id="reset-send-history-btn" onclick="resetSendHistory()">
+                            🔄 重置今日發送記錄
+                        </button>
+                        <button class="btn btn-copy" id="copy-emails-btn">📋 複製所有信箱</button>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-copy" id="copy-emails-btn">📋 複製所有信箱</button>
+                        <button class="btn btn-secondary" id="deduplicate-btn">去重處理</button>
+                        <button class="btn btn-secondary" id="refresh-btn">重新整理</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="customers-table">
+                        <thead>
+                            <tr>
+                                <th>名稱</th>
+                                <th>Email</th>
+                                <th>電話</th>
+                                <th>發送狀態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-tbody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="manage-result" class="result"></div>
+            </div>
+        </div>
+
+        <!-- 導入資料標籤頁 -->
+        <div class="tab-content" id="import-tab">
+            <div class="card">
+                <h2>導入客戶資料</h2>
+                <div class="form-group">
+                    <label>從 JSON 格式導入：</label>
+                    <textarea id="import-data" rows="10" placeholder='[{"name":"客戶名稱","email":"email@example.com","phone":"0912345678"}]'></textarea>
+                </div>
+                <div class="form-group">
+                    <label>或從 CSV 格式導入（格式：名稱,Email,電話）：</label>
+                    <textarea id="import-csv" rows="10" placeholder="客戶名稱,email@example.com,0912345678"></textarea>
+                </div>
+                <button class="btn btn-primary" id="import-btn">導入資料</button>
+                <div id="import-result" class="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯客戶模態框 -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>編輯客戶</h2>
+            <form id="edit-form">
+                <input type="hidden" id="edit-id">
+                <div class="form-group">
+                    <label>名稱：</label>
+                    <input type="text" id="edit-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Email：</label>
+                    <input type="email" id="edit-email" required>
+                </div>
+                <div class="form-group">
+                    <label>電話：</label>
+                    <input type="text" id="edit-phone">
+                </div>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
