@@ -1,5 +1,9 @@
 node_modules/
-data/*.json
+# 排除實際客戶資料（保護隱私）
+data/customers.json
+data/send-stats.json
+# 但允許示例文件
+!data/customers.example.json
 .env
 .DS_Store
 *.log
