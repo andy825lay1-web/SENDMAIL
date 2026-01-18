@@ -1,5 +1,5 @@
-// API 基礎 URL
-const API_BASE = 'http://localhost:3000/api';
+// API 基礎 URL（從 config.js 載入，如果不存在則使用預設值）
+const API_BASE = window.API_BASE || 'http://localhost:3000/api';
 
 // 載入發送統計
 async function loadSendStats(email) {

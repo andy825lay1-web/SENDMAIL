@@ -9,7 +9,14 @@ const app = express();
 const PORT = 3000;
 
 // 中間件
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://andy825lay1-web.github.io',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ],
+  credentials: true
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -843,9 +850,10 @@ app.get('/favicon.ico', (req, res) => {
 });
 
 // 啟動伺服器
-app.listen(PORT, () => {
-  console.log(`伺服器運行在 http://localhost:${PORT}`);
-  console.log(`請在瀏覽器中訪問：http://localhost:${PORT}`);
+const serverPort = process.env.PORT || PORT;
+app.listen(serverPort, () => {
+  console.log(`伺服器運行在 http://localhost:${serverPort}`);
+  console.log(`請在瀏覽器中訪問：http://localhost:${serverPort}`);
   console.log(`\n📊 Gmail 發送限制配置：`);
   console.log(`   每日限制：${GMAIL_LIMITS.FREE_DAILY_LIMIT} 封（免費帳號）`);
   console.log(`   每小時限制：${GMAIL_LIMITS.FREE_HOURLY_LIMIT} 封`);
