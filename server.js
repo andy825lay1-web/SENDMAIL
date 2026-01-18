@@ -4,6 +4,7 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const fs = require('fs').promises;
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = 3000;
@@ -24,6 +25,13 @@ app.use(express.static('public'));
 // 資料檔案路徑
 const DATA_FILE = path.join(__dirname, 'data', 'customers.json');
 const STATS_FILE = path.join(__dirname, 'data', 'send-stats.json');
+
+// Supabase 配置
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sqgrnowrcvspxhuudrqc.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxZ3Jub3dyY3ZzcHhodXVkcnFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMTExNjYsImV4cCI6MjA4Mzc4NzE2Nn0.VMg-7oQTmPapHLGeLzEZ3l_5zcyCZRjJdw_X2J-8kRw';
+
+// 創建 Supabase 客戶端
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 發送進度追蹤（使用 Map 存儲）
 const sendingProgress = new Map();
@@ -205,21 +213,99 @@ async function ensureDataDir() {
   }
 }
 
-// 讀取客戶資料
+// 讀取客戶資料（從 Supabase）
 async function readCustomers() {
   try {
-    await ensureDataDir();
-    const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
+    // 從 Supabase 讀取客戶資料
+    const { data, error } = await supabase
+      .from('sendmail_customers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('從 Supabase 讀取客戶資料失敗:', error);
+      // 如果 Supabase 讀取失敗，回退到本地 JSON（如果有）
+      try {
+        await ensureDataDir();
+        const localData = await fs.readFile(DATA_FILE, 'utf8');
+        const localCustomers = JSON.parse(localData);
+        console.log('使用本地 JSON 文件作為備份，客戶數:', localCustomers.length);
+        return localCustomers;
+      } catch (localError) {
+        return [];
+      }
+    }
+    
+    // 轉換 Supabase 資料格式為應用程式格式
+    const customers = data.map(row => ({
+      id: row.customer_id,
+      name: row.name || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      lastSentDate: row.last_sent_date || null,
+      sentCount: row.sent_count || 0,
+      sendHistory: row.send_history || []
+    }));
+    
+    console.log(`✅ 從 Supabase 讀取 ${customers.length} 位客戶`);
+    return customers;
   } catch (error) {
-    return [];
+    console.error('讀取客戶資料錯誤:', error);
+    // 回退到本地 JSON
+    try {
+      await ensureDataDir();
+      const localData = await fs.readFile(DATA_FILE, 'utf8');
+      return JSON.parse(localData);
+    } catch (localError) {
+      return [];
+    }
   }
 }
 
-// 儲存客戶資料
+// 儲存客戶資料（同時保存到 Supabase 和本地 JSON）
 async function saveCustomers(customers) {
-  await ensureDataDir();
-  await fs.writeFile(DATA_FILE, JSON.stringify(customers, null, 2), 'utf8');
+  try {
+    // 轉換為 Supabase 格式
+    const supabaseCustomers = customers.map(customer => ({
+      customer_id: customer.id || String(Date.now() + Math.random()),
+      name: customer.name || '',
+      email: (customer.email || '').trim(),
+      phone: customer.phone || null,
+      last_sent_date: customer.lastSentDate || null,
+      sent_count: customer.sentCount || 0,
+      send_history: customer.sendHistory || []
+    }));
+    
+    // 使用 upsert 批量保存到 Supabase
+    const { data, error } = await supabase
+      .from('sendmail_customers')
+      .upsert(supabaseCustomers, { 
+        onConflict: 'customer_id',
+        ignoreDuplicates: false 
+      });
+    
+    if (error) {
+      console.error('保存到 Supabase 失敗:', error);
+      // 如果 Supabase 保存失敗，仍保存到本地 JSON
+      await ensureDataDir();
+      await fs.writeFile(DATA_FILE, JSON.stringify(customers, null, 2), 'utf8');
+      console.log('已保存到本地 JSON 文件');
+    } else {
+      console.log(`✅ 已保存 ${supabaseCustomers.length} 位客戶到 Supabase`);
+      // 同時保存到本地 JSON 作為備份
+      await ensureDataDir();
+      await fs.writeFile(DATA_FILE, JSON.stringify(customers, null, 2), 'utf8');
+    }
+  } catch (error) {
+    console.error('保存客戶資料錯誤:', error);
+    // 回退到本地 JSON
+    try {
+      await ensureDataDir();
+      await fs.writeFile(DATA_FILE, JSON.stringify(customers, null, 2), 'utf8');
+    } catch (localError) {
+      console.error('保存到本地 JSON 也失敗:', localError);
+    }
+  }
 }
 
 // 去重處理（根據 email）
